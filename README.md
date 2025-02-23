@@ -56,6 +56,11 @@ npm run lint
 - **Vue 3**
 - **Vite**
 
+### Demo Links
+
+- [Free User Demo](https://vue3-vite-todo-list-rho.vercel.app/?userRole=free)
+- [Paid User Demo](https://vue3-vite-todo-list-rho.vercel.app/?userRole=paid)
+
 ## 📸 Demo Screens <a name="demo-screens"></a>
 
 <div align="center">
