@@ -1,10 +1,20 @@
 <template>
   <div class="bg-white rounded-3xl shadow-lg p-6">
+    <!-- Error message -->
+    <div 
+      v-if="error"
+      data-test="error-message"
+      class="mb-4 p-4 bg-red-50 text-red-600 rounded-lg"
+    >
+      {{ error }}
+    </div>
+
     <div class="flex justify-between items-center mb-2">
       <h2 class="text-2xl font-medium text-gray-800">Tasks List</h2>
       <button
         @click="showForm = true"
         class="w-8 h-8 flex items-center justify-center rounded-full bg-[#ffd700] hover:bg-[#e6c300] transition-colors"
+        data-test="add-todo-button"
       >
         <span class="text-white text-xl">+</span>
       </button>
@@ -17,23 +27,27 @@
       :todoToEdit="selectedTodo"
       @submit="handleTodoSubmit"
       @cancel="handleFormCancel"
+      data-test="todo-form"
     />
 
     <div class="space-y-4">
       <div
         v-for="todo in todos"
         :key="todo.id"
+        data-test="todo-item"
         class="border border-gray-100 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow animate animate-fade-right"
       >
         <!-- Todo Header - Always visible -->
         <div 
           class="flex items-start space-x-3 p-4 bg-white cursor-pointer"
           @click="toggleAccordion(todo.id)"
+          data-test="accordion-toggle"
         >
           <div 
             class="w-5 h-5 rounded-full border-2 border-[#ffd700] flex-shrink-0 mt-1 cursor-pointer"
             :class="{ 'bg-[#ffd700]': todo.completed }"
             @click.stop="toggleTodo(todo)"
+            data-test="todo-checkbox"
           >
             <svg
               v-if="todo.completed"
@@ -54,31 +68,25 @@
                   'line-through text-gray-400': todo.completed,
                   'text-gray-800': !todo.completed
                 }"
+                data-test="todo-title"
               >{{ todo.title }}</span>
               <div class="flex items-center space-x-2">
-                <span class="text-sm text-gray-500">{{ formatTime(todo.createdAt) }}</span>
+                <span class="text-sm text-gray-500" data-test="todo-created-at">{{ formatTime(todo.createdAt) }}</span>
                 <div class="flex space-x-1">
                   <button
                     @click.stop="editTodo(todo)"
                     class="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-[#ffd700] transition-colors"
+                    data-test="edit-todo-button"
                   >
                     <Edit2 :size="16" />
                   </button>
                   <button
                     @click.stop="deleteTodo(todo.id)"
                     class="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-red-500 transition-colors"
+                    data-test="delete-todo-button"
                   >
                     <Trash2 :size="16" />
                   </button>
-                  <!-- <button
-                    @click.stop="toggleAccordion(todo.id)"
-                    class="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-[#ffd700] transition-colors"
-                  >
-                    <ChevronDown
-                      :size="16"
-                      :class="{ 'transform rotate-180 transition-transform': expandedItems.includes(todo.id) }"
-                    />
-                  </button> -->
                 </div>
               </div>
             </div>
@@ -87,7 +95,8 @@
 
         <!-- Todo Details - Expandable Content -->
         <div 
-
+          v-show="expandedItems.includes(todo.id)"
+          data-test="accordion-content"
           class="bg-gray-50 overflow-hidden transition-all duration-200 ease-in-out"
           :class="[
             expandedItems.includes(todo.id) ? 'opacity-100' : 'opacity-0',
@@ -98,7 +107,7 @@
             <!-- Time if available -->
             <div v-if="todo.time" class="mb-3">
               <span class="text-sm font-medium text-gray-600">Time:</span>
-              <span class="ml-2 text-sm text-gray-500">{{ todo.time }}</span>
+              <span class="ml-2 text-sm text-gray-500" data-test="todo-time">{{ todo.time }}</span>
             </div>
 
             <!-- Notes section -->
@@ -109,11 +118,13 @@
                   rows="3"
                   class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ffd700] focus:border-transparent"
                   placeholder="Add a note..."
+                  data-test="note-textarea"
                 ></textarea>
                 <div class="mt-2 flex space-x-2">
                   <button
                     @click="saveNote(todo)"
                     class="px-3 py-1.5 bg-[#ffd700] text-white rounded-lg hover:bg-[#e6c300] transition-colors inline-flex items-center space-x-2"
+                    data-test="save-note-button"
                   >
                     <Check :size="16" />
                     <span>Save</span>
@@ -121,6 +132,7 @@
                   <button
                     @click="cancelEditNote"
                     class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors inline-flex items-center space-x-2"
+                    data-test="cancel-note-button"
                   >
                     <X :size="16" />
                     <span>Cancel</span>
@@ -135,6 +147,7 @@
                       v-if="todo.notes"
                       @click="editNote(todo)"
                       class="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-[#ffd700] transition-colors"
+                      data-test="edit-note-button"
                     >
                       <Edit2 :size="14" />
                     </button>
@@ -142,18 +155,20 @@
                       v-if="todo.notes"
                       @click="deleteNote(todo)"
                       class="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-red-500 transition-colors"
+                      data-test="delete-note-button"
                     >
                       <Trash2 :size="14" />
                     </button>
                   </div>
                 </div>
-                <p v-if="todo.notes" class="mt-1 text-sm text-gray-600">
+                <p v-if="todo.notes" class="mt-1 text-sm text-gray-600" data-test="todo-notes">
                   {{ todo.notes }}
                 </p>
                 <button
                   v-else
                   @click="editNote(todo)"
                   class="mt-1 text-sm text-[#ffd700] hover:text-[#e6c300] transition-colors inline-flex items-center space-x-1"
+                  data-test="add-note-button"
                 >
                   <Plus :size="14" />
                   <span>Add note</span>
