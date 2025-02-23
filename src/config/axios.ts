@@ -5,8 +5,7 @@ const axiosInstance: AxiosInstance = axios.create({
   headers: {
     Accept: 'application/json',
     'Content-Type': 'application/json',
-  },
-  withCredentials: true
+  }
 });
 
 // Add response interceptor for error handling
