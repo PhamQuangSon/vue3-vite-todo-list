@@ -186,7 +186,7 @@
 import { defineComponent, ref, onMounted } from 'vue';
 import type { TodoItem } from "../types/todo"
 import { getTodos, createTodo, updateTodo as updateTodoApi, deleteTodo as deleteTodoApi } from '../services/todoService';
-import { Edit2, Trash2, ChevronDown, Plus, Check, X } from 'lucide-vue-next';
+import { Edit2, Trash2, Plus, Check, X } from 'lucide-vue-next';
 import TodoForm from './TodoForm.vue';
 
 export default defineComponent({
@@ -195,7 +195,6 @@ export default defineComponent({
     TodoForm,
     Edit2,
     Trash2,
-    ChevronDown,
     Plus,
     Check,
     X
@@ -228,7 +227,7 @@ export default defineComponent({
 
     const fetchTodos = async () => {
       try {
-        todos.value = await getTodos(props.userRole);
+        todos.value = await getTodos();
         error.value = null;
       } catch (err) {
         error.value = 'Failed to fetch todos. Please try again.';
@@ -241,13 +240,14 @@ export default defineComponent({
     const handleTodoSubmit = async (todoData: Partial<TodoItem>) => {
       try {
         if (selectedTodo.value) {
-          const updatedTodo = await updateTodoApi(todoData as TodoItem, props.userRole);
-          const index = todos.value.findIndex(t => t.id === selectedTodo.value?.id);
+          const { id } = selectedTodo.value;
+          const updatedTodo = await updateTodoApi(id, todoData);
+          const index = todos.value.findIndex(t => t.id === id);
           if (index !== -1) {
             todos.value[index] = updatedTodo;
           }
         } else {
-          const newTodo = await createTodo(todoData as Omit<TodoItem, 'id'>, props.userRole);
+          const newTodo = await createTodo(todoData as Omit<TodoItem, 'id' | 'createdAt'>);
           todos.value.push(newTodo);
         }
         handleFormCancel();
@@ -270,8 +270,7 @@ export default defineComponent({
 
     const toggleTodo = async (todo: TodoItem) => {
       try {
-        const updatedTodo = { ...todo, completed: !todo.completed };
-        await updateTodoApi(updatedTodo, props.userRole);
+        const updatedTodo = await updateTodoApi(todo.id, { completed: !todo.completed });
         const index = todos.value.findIndex((t) => t.id === todo.id);
         if (index !== -1) {
           todos.value[index] = updatedTodo;
@@ -295,8 +294,7 @@ export default defineComponent({
 
     const saveNote = async (todo: TodoItem) => {
       try {
-        const updatedTodo = { ...todo, notes: editingNoteText.value };
-        await updateTodoApi(updatedTodo, props.userRole);
+        const updatedTodo = await updateTodoApi(todo.id, { notes: editingNoteText.value });
         const index = todos.value.findIndex((t) => t.id === todo.id);
         if (index !== -1) {
           todos.value[index] = updatedTodo;
@@ -312,8 +310,7 @@ export default defineComponent({
 
     const deleteNote = async (todo: TodoItem) => {
       try {
-        const updatedTodo = { ...todo, notes: undefined };
-        await updateTodoApi(updatedTodo, props.userRole);
+        const updatedTodo = await updateTodoApi(todo.id, { notes: undefined });
         const index = todos.value.findIndex((t) => t.id === todo.id);
         if (index !== -1) {
           todos.value[index] = updatedTodo;
@@ -337,7 +334,7 @@ export default defineComponent({
       }
     };
 
-    const formatTime = (date: Date) => {
+    const formatTime = (date: string) => {
       return new Date(date).toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: 'numeric',

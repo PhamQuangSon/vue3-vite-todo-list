@@ -25,3 +25,4 @@ dist-ssr
 .husky/pre-commit
 package-lock.json
 .env*
+!.env.example
