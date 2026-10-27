@@ -1,23 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios'
 import { isRateLimited, isUnauthenticated, toApiError } from '../errors'
 import { messageFor } from '../messages'
-import type { ApiErrorBody } from '@/types/api'
-
-function axiosErrorWith(
-  status: number,
-  data: Partial<ApiErrorBody>,
-  headers: Record<string, string> = {},
-): AxiosError {
-  const config = { headers: new AxiosHeaders() } as InternalAxiosRequestConfig
-  return new AxiosError('request failed', 'ERR_BAD_REQUEST', config, null, {
-    status,
-    statusText: '',
-    headers,
-    config,
-    data,
-  })
-}
+import { axiosErrorWith, networkError } from '../../../test/helpers/axios'
 
 describe('toApiError', () => {
   it('reads code, message and the extra fields off the envelope', () => {
@@ -65,8 +49,7 @@ describe('toApiError', () => {
   })
 
   it('reports a request that never got a response as NETWORK_ERROR', () => {
-    const config = { headers: new AxiosHeaders() } as InternalAxiosRequestConfig
-    const e = toApiError(new AxiosError('Network Error', 'ERR_NETWORK', config))
+    const e = toApiError(networkError())
 
     expect(e).toMatchObject({ status: 0, code: 'NETWORK_ERROR' })
   })
