@@ -6,7 +6,7 @@
       :placeholder="isEditing ? 'Edit task title' : 'Enter task title'"
       class="w-full px-4 py-2 text-lg border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ffd700] focus:border-transparent"
     />
-    <div v-if="userRole === 'paid'" class="mt-3">
+    <div v-if="plan === 'PAID'" class="mt-3">
       <input
         type="time"
         v-model="time"
@@ -41,9 +41,10 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from 'vue'
+import { defineComponent, ref, watch, type PropType } from 'vue'
 import { Plus, Check, X } from 'lucide-vue-next'
-import type { TodoItem } from '../types/todo'
+import type { TodoItem, UpdateTodoPayload } from '../types/todo'
+import type { Plan } from '../types/auth'
 
 export default defineComponent({
   name: 'TodoForm',
@@ -53,16 +54,19 @@ export default defineComponent({
     X,
   },
   props: {
-    userRole: {
-      type: String,
+    plan: {
+      type: String as PropType<Plan>,
       required: true,
     },
     todoToEdit: {
-      type: Object as () => TodoItem | null,
+      type: Object as PropType<TodoItem | null>,
       default: null,
     },
   },
-  emits: ['submit', 'cancel'],
+  emits: {
+    submit: (payload: UpdateTodoPayload) => typeof payload.title === 'string',
+    cancel: () => true,
+  },
   setup(props, { emit }) {
     const title = ref('')
     const time = ref('')
@@ -79,8 +83,8 @@ export default defineComponent({
     const updateFormWithTodo = (todo: TodoItem | null) => {
       if (todo) {
         title.value = todo.title
-        time.value = todo.time || ''
-        notes.value = todo.notes || ''
+        time.value = todo.time ?? ''
+        notes.value = todo.notes ?? ''
         isEditing.value = true
       } else {
         resetForm()
@@ -93,22 +97,22 @@ export default defineComponent({
     const handleSubmit = () => {
       if (!title.value.trim()) return
 
-      const todoData = {
-        title: title.value,
-        completed: props.todoToEdit?.completed || false,
-        createdAt: props.todoToEdit?.createdAt || new Date(),
-        ...(props.userRole === 'paid' && {
-          time: time.value || undefined,
-          notes: notes.value.trim() || undefined,
-        }),
+      // Only fields the API's DTOs accept. This used to carry `createdAt` (as a
+      // Date object, into a field typed string) and, when editing, `id` — both
+      // of which the API now rejects outright with a 400, because its
+      // ValidationPipe runs with forbidNonWhitelisted. The todo being edited is
+      // identified by the parent, not by the payload.
+      const payload: UpdateTodoPayload = {
+        title: title.value.trim(),
+        completed: props.todoToEdit?.completed ?? false,
       }
 
-      if (props.todoToEdit) {
-        emit('submit', { ...todoData, id: props.todoToEdit.id })
-      } else {
-        emit('submit', todoData)
+      if (props.plan === 'PAID') {
+        payload.time = time.value
+        payload.notes = notes.value.trim()
       }
 
+      emit('submit', payload)
       resetForm()
     }
 

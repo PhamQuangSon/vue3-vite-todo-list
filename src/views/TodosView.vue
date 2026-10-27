@@ -16,11 +16,6 @@ const greeting = computed(() => {
   return 'Good Evening'
 })
 
-// The plan comes from the JWT claim now, not from a ?userRole query parameter
-// anyone could edit. The prop still speaks the old vocabulary; renaming it is
-// part of bringing TodoList itself onto the real API.
-const userRole = computed(() => (auth.plan === 'PAID' ? 'paid' : 'free'))
-
 async function onLogout() {
   await auth.logout()
   await router.replace({ name: 'login' })
@@ -55,6 +50,8 @@ async function onLogout() {
       <h2 class="text-2xl font-medium text-gray-800">{{ greeting }}</h2>
     </div>
 
-    <TodoList :user-role="userRole" />
+    <!-- The plan comes from the JWT claim, not a ?userRole query parameter
+         anyone could edit. -->
+    <TodoList :plan="auth.plan" />
   </main>
 </template>

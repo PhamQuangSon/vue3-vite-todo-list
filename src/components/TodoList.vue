@@ -15,11 +15,13 @@
         <span class="text-white text-xl">+</span>
       </button>
     </div>
-    <p class="text-lg text-gray-800 mb-4">You have {{ todos.length }} task for today</p>
+    <p class="text-lg text-gray-800 mb-4">
+      You have {{ todos.length }} {{ todos.length === 1 ? 'task' : 'tasks' }}
+    </p>
     <!-- Todo Form -->
     <TodoForm
       v-if="showForm"
-      :userRole="userRole"
+      :plan="plan"
       :todoToEdit="selectedTodo"
       @submit="handleTodoSubmit"
       @cancel="handleFormCancel"
@@ -36,7 +38,7 @@
         <!-- Todo Header - Always visible -->
         <div
           class="flex items-start space-x-3 p-4 bg-white cursor-pointer"
-          @click="toggleAccordion(todo.id)"
+          @click="toggleAccordion(todo)"
           data-test="accordion-toggle"
         >
           <div
@@ -110,8 +112,11 @@
             </div>
 
             <!-- Notes section -->
-            <div v-if="userRole === 'paid'" class="space-y-2">
-              <div v-if="editingNoteId === todo.id">
+            <div v-if="plan === 'PAID'" class="space-y-2">
+              <p v-if="loadingNoteIds.includes(todo.id)" class="text-sm text-gray-500">
+                Loading note…
+              </p>
+              <div v-else-if="editingNoteId === todo.id">
                 <textarea
                   v-model="editingNoteText"
                   rows="3"
@@ -182,14 +187,18 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted } from 'vue'
-import type { TodoItem } from '../types/todo'
+import { defineComponent, ref, onMounted, type PropType } from 'vue'
+import type { TodoItem, UpdateTodoPayload } from '../types/todo'
+import type { Plan } from '../types/auth'
 import {
   getTodos,
+  getTodo,
   createTodo,
   updateTodo as updateTodoApi,
   deleteTodo as deleteTodoApi,
 } from '../services/todoService'
+import { toApiError } from '../api/errors'
+import { messageFor } from '../api/messages'
 import { Edit2, Trash2, Plus, Check, X } from 'lucide-vue-next'
 import TodoForm from './TodoForm.vue'
 
@@ -204,12 +213,13 @@ export default defineComponent({
     X,
   },
   props: {
-    userRole: {
-      type: String,
+    /** From the JWT claim, not a query parameter the user can edit. */
+    plan: {
+      type: String as PropType<Plan>,
       required: true,
     },
   },
-  setup() {
+  setup(props) {
     const todos = ref<TodoItem[]>([])
     const error = ref<string | null>(null)
     const showForm = ref(false)
@@ -217,54 +227,88 @@ export default defineComponent({
     const expandedItems = ref<string[]>([])
     const editingNoteId = ref<string | null>(null)
     const editingNoteText = ref('')
+    const loadingNoteIds = ref<string[]>([])
 
-    const toggleAccordion = (todoId: string) => {
-      const index = expandedItems.value.indexOf(todoId)
+    /**
+     * Every failure path used to invent its own sentence ("Failed to save note.
+     * Please try again."), which hid what the API actually said — a 403
+     * QUOTA_EXCEEDED and a 429 RATE_LIMITED both read as "please try again".
+     * Now the API's stable `code` chooses the wording.
+     */
+    const report = (e: unknown) => {
+      error.value = messageFor(toApiError(e))
+      console.error(e)
+    }
+
+    const replaceTodo = (updated: TodoItem) => {
+      const index = todos.value.findIndex((t) => t.id === updated.id)
+      if (index !== -1) todos.value[index] = updated
+    }
+
+    /**
+     * Loads `notes` for one todo.
+     *
+     * GET /todos deliberately omits that column, so a paid user's existing note
+     * is simply absent from the list. Without this the UI shows "Add note" on
+     * every todo and the edit and delete buttons — gated on `todo.notes` — never
+     * appear, so the paid feature looks broken.
+     */
+    const loadNotes = async (todo: TodoItem) => {
+      if (props.plan !== 'PAID' || todo.notes !== undefined) return
+
+      loadingNoteIds.value.push(todo.id)
+      try {
+        replaceTodo(await getTodo(todo.id))
+        error.value = null
+      } catch (e) {
+        report(e)
+      } finally {
+        loadingNoteIds.value = loadingNoteIds.value.filter((id) => id !== todo.id)
+      }
+    }
+
+    const toggleAccordion = (todo: TodoItem) => {
+      const index = expandedItems.value.indexOf(todo.id)
       if (index === -1) {
-        // Expand with animation
-        expandedItems.value.push(todoId)
+        expandedItems.value.push(todo.id)
+        void loadNotes(todo)
       } else {
-        // Collapse with animation
         expandedItems.value.splice(index, 1)
       }
     }
 
     const fetchTodos = async () => {
       try {
-        todos.value = await getTodos()
+        // The API answers with { items, nextCursor }, not a bare array.
+        const { items } = await getTodos()
+        todos.value = items
         error.value = null
-      } catch (err) {
-        error.value = 'Failed to fetch todos. Please try again.'
-        console.error(err)
+      } catch (e) {
+        report(e)
       }
     }
 
     onMounted(fetchTodos)
 
-    const handleTodoSubmit = async (todoData: Partial<TodoItem>) => {
-      try {
-        if (selectedTodo.value) {
-          const { id } = selectedTodo.value
-          const updatedTodo = await updateTodoApi(id, todoData)
-          const index = todos.value.findIndex((t) => t.id === id)
-          if (index !== -1) {
-            todos.value[index] = updatedTodo
-          }
-        } else {
-          const newTodo = await createTodo(todoData as Omit<TodoItem, 'id' | 'createdAt'>)
-          todos.value.push(newTodo)
-        }
-        handleFormCancel()
-        error.value = null
-      } catch (err) {
-        error.value = `Failed to ${selectedTodo.value ? 'update' : 'create'} todo. Please try again.`
-        console.error(err)
-      }
-    }
-
     const handleFormCancel = () => {
       showForm.value = false
       selectedTodo.value = null
+    }
+
+    const handleTodoSubmit = async (todoData: UpdateTodoPayload) => {
+      const editing = selectedTodo.value
+      try {
+        if (editing) {
+          replaceTodo(await updateTodoApi(editing.id, todoData))
+        } else {
+          if (!todoData.title) return
+          todos.value.push(await createTodo({ ...todoData, title: todoData.title }))
+        }
+        handleFormCancel()
+        error.value = null
+      } catch (e) {
+        report(e)
+      }
     }
 
     const editTodo = (todo: TodoItem) => {
@@ -274,21 +318,16 @@ export default defineComponent({
 
     const toggleTodo = async (todo: TodoItem) => {
       try {
-        const updatedTodo = await updateTodoApi(todo.id, { completed: !todo.completed })
-        const index = todos.value.findIndex((t) => t.id === todo.id)
-        if (index !== -1) {
-          todos.value[index] = updatedTodo
-        }
+        replaceTodo(await updateTodoApi(todo.id, { completed: !todo.completed }))
         error.value = null
-      } catch (err) {
-        error.value = 'Failed to update todo. Please try again.'
-        console.error(err)
+      } catch (e) {
+        report(e)
       }
     }
 
     const editNote = (todo: TodoItem) => {
       editingNoteId.value = todo.id
-      editingNoteText.value = todo.notes || ''
+      editingNoteText.value = todo.notes ?? ''
     }
 
     const cancelEditNote = () => {
@@ -298,31 +337,24 @@ export default defineComponent({
 
     const saveNote = async (todo: TodoItem) => {
       try {
-        const updatedTodo = await updateTodoApi(todo.id, { notes: editingNoteText.value })
-        const index = todos.value.findIndex((t) => t.id === todo.id)
-        if (index !== -1) {
-          todos.value[index] = updatedTodo
-        }
-        editingNoteId.value = null
-        editingNoteText.value = ''
+        replaceTodo(await updateTodoApi(todo.id, { notes: editingNoteText.value }))
+        cancelEditNote()
         error.value = null
-      } catch (err) {
-        error.value = 'Failed to save note. Please try again.'
-        console.error(err)
+      } catch (e) {
+        report(e)
       }
     }
 
     const deleteNote = async (todo: TodoItem) => {
       try {
-        const updatedTodo = await updateTodoApi(todo.id, { notes: undefined })
-        const index = todos.value.findIndex((t) => t.id === todo.id)
-        if (index !== -1) {
-          todos.value[index] = updatedTodo
-        }
+        // An empty string, not undefined: JSON.stringify drops an undefined
+        // value, so the request body was `{}` and the note was never cleared.
+        // null is not an option either — the DTO validates notes with
+        // @IsString(), so it would be a 400.
+        replaceTodo(await updateTodoApi(todo.id, { notes: '' }))
         error.value = null
-      } catch (err) {
-        error.value = 'Failed to delete note. Please try again.'
-        console.error(err)
+      } catch (e) {
+        report(e)
       }
     }
 
@@ -332,9 +364,8 @@ export default defineComponent({
         todos.value = todos.value.filter((t) => t.id !== id)
         expandedItems.value = expandedItems.value.filter((itemId) => itemId !== id)
         error.value = null
-      } catch (err) {
-        error.value = 'Failed to delete todo. Please try again.'
-        console.error(err)
+      } catch (e) {
+        report(e)
       }
     }
 
@@ -356,6 +387,7 @@ export default defineComponent({
       expandedItems,
       editingNoteId,
       editingNoteText,
+      loadingNoteIds,
       handleTodoSubmit,
       handleFormCancel,
       editTodo,
