@@ -4,84 +4,54 @@
 <img src="./public/ui-screenshot.png" alt="UI Screenshot">
 </div>
 
-## 🏁 Getting Started <a name="getting-started"></a>
+Vue 3 frontend for [`nest-todo-list-api`](../nest-todo-list-api). The API owns auth,
+per-user data, quotas and rate limiting; this app talks to it over HTTP.
 
-> This is a list of needed instructions to set up your project locally, to get a local copy up and running follow these
-> instructions.
+## Prerequisites
 
-### Prerequisite <a name="prerequisite"></a>
+- **Node.js 22.12+ or 24+** — pinned in `.nvmrc`, so `nvm use` picks it up. Vite 7,
+  Vitest 5 and jsdom 30 all refuse to run on Node 20.
+- **pnpm** — the lockfile is `pnpm-lock.yaml`. Do not use npm.
+- **The API running.** From the API repo: `docker compose up -d --scale api=3`.
+  It is served through nginx at `http://localhost:3000/api/v1`, and its
+  `CORS_ORIGINS` already allows `http://localhost:5173`.
+- **Chrome, Edge or Firefox for development.** The refresh-token cookie is
+  `Secure`, and Safari refuses `Secure` cookies over plain `http`, including on
+  localhost — login appears to work and then every refresh fails.
 
-1. Node.js
-
-### Installation <a name="installation"></a>
-
-1. **_Clone the repository_**
-
-```sh
-$ git clone https://github.com/PhamQuangSon/vue3-vite-todo-list.git
-```
-
-2. **_Navigate to TodoList Folder_**
+## Setup
 
 ```sh
-$ cd vue3-vite-todo-list
+nvm use
+pnpm install
+cp .env.example .env     # VITE_API_URL, defaults to the value the API uses
+pnpm dev
 ```
 
-## Project Setup
+## Scripts
 
-```sh
-npm install
-```
+| command | what it does |
+|---|---|
+| `pnpm dev` | dev server with HMR on port 5173 |
+| `pnpm build` | type-check, then build to `dist/` |
+| `pnpm preview` | serve the production build |
+| `pnpm type-check` | `vue-tsc --build` across the app, node and vitest projects |
+| `pnpm lint` | ESLint flat config, with `--fix` |
+| `pnpm format` | Prettier over `src/` |
+| `pnpm test` | Vitest in watch mode |
+| `pnpm test:run` | Vitest once |
+| `pnpm test:coverage` | Vitest with v8 coverage |
 
-### Compile and Hot-Reload for Development
+## Built using
 
-```sh
-npm run dev
-```
+Vue 3 (`<script setup>`) · Vite 7 · TypeScript · Pinia · Vue Router ·
+TanStack Query *(planned)* · Tailwind CSS 4 + shadcn-vue · Axios · Vitest
 
-### Type-Check, Compile and Minify for Production
+## Recommended IDE setup
 
-```sh
-npm run build
-```
+[VS Code](https://code.visualstudio.com/) +
+[Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar).
+The old `TypeScript Vue Plugin (Volar)` extension is deprecated and should be
+uninstalled — the Vue extension handles `.vue` type information on its own.
 
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
-npm run lint
-```
-
-## 💻 Built Using <a name="built-using"></a>
-
-- **Vue 3**
-- **Vite**
-
-### Demo Links
-
-- [Free User Demo](https://vue3-vite-todo-list-rho.vercel.app/?userRole=free)
-- [Paid User Demo](https://vue3-vite-todo-list-rho.vercel.app/?userRole=paid)
-
-## 📸 Demo Screens <a name="demo-screens"></a>
-
-<div align="center">
-<img src="./public/ui-screenshot.png" alt="UI Screenshot">
-</div>
-
-## Recommended IDE Setup
-
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin).
-
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin) to make the TypeScript language service aware of `.vue` types.
-
-If the standalone TypeScript plugin doesn't feel fast enough to you, Volar has also implemented a [Take Over Mode](https://github.com/johnsoncodehk/volar/discussions/471#discussioncomment-1361669) that is more performant. You can enable it by the following steps:
-
-1. Disable the built-in TypeScript Extension
-    1) Run `Extensions: Show Built-in Extensions` from VSCode's command palette
-    2) Find `TypeScript and JavaScript Language Features`, right click and select `Disable (Workspace)`
-2. Reload the VSCode window by running `Developer: Reload Window` from the command palette.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vitejs.dev/config/).
+`tsc` cannot type-check `.vue` files, which is why `type-check` uses `vue-tsc`.

@@ -1,11 +1,7 @@
 <template>
   <div class="bg-white rounded-3xl shadow-lg p-6">
     <!-- Error message -->
-    <div 
-      v-if="error"
-      data-test="error-message"
-      class="mb-4 p-4 bg-red-50 text-red-600 rounded-lg"
-    >
+    <div v-if="error" data-test="error-message" class="mb-4 p-4 bg-red-50 text-red-600 rounded-lg">
       {{ error }}
     </div>
 
@@ -38,12 +34,12 @@
         class="border border-gray-100 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow animate animate-fade-right"
       >
         <!-- Todo Header - Always visible -->
-        <div 
+        <div
           class="flex items-start space-x-3 p-4 bg-white cursor-pointer"
           @click="toggleAccordion(todo.id)"
           data-test="accordion-toggle"
         >
-          <div 
+          <div
             class="w-5 h-5 rounded-full border-2 border-[#ffd700] flex-shrink-0 mt-1 cursor-pointer"
             :class="{ 'bg-[#ffd700]': todo.completed }"
             @click.stop="toggleTodo(todo)"
@@ -66,12 +62,15 @@
                 :class="{
                   'text-lg': true,
                   'line-through text-gray-400': todo.completed,
-                  'text-gray-800': !todo.completed
+                  'text-gray-800': !todo.completed,
                 }"
                 data-test="todo-title"
-              >{{ todo.title }}</span>
+                >{{ todo.title }}</span
+              >
               <div class="flex items-center space-x-2">
-                <span class="text-sm text-gray-500" data-test="todo-created-at">{{ formatTime(todo.createdAt) }}</span>
+                <span class="text-sm text-gray-500" data-test="todo-created-at">{{
+                  formatTime(todo.createdAt)
+                }}</span>
                 <div class="flex space-x-1">
                   <button
                     @click.stop="editTodo(todo)"
@@ -94,16 +93,16 @@
         </div>
 
         <!-- Todo Details - Expandable Content -->
-        <div 
+        <div
           v-show="expandedItems.includes(todo.id)"
           data-test="accordion-content"
           class="bg-gray-50 overflow-hidden transition-all duration-200 ease-in-out"
-          :class="[
-            expandedItems.includes(todo.id) ? 'opacity-100' : 'opacity-0',
-            'bg-gray-50'
-          ]"
+          :class="[expandedItems.includes(todo.id) ? 'opacity-100' : 'opacity-0', 'bg-gray-50']"
         >
-          <div v-if="expandedItems.includes(todo.id)" class="pt-4 px-4 pb-4 border-t border-gray-100 animate animate-fade-up">
+          <div
+            v-if="expandedItems.includes(todo.id)"
+            class="pt-4 px-4 pb-4 border-t border-gray-100 animate animate-fade-up"
+          >
             <!-- Time if available -->
             <div v-if="todo.time" class="mb-3">
               <span class="text-sm font-medium text-gray-600">Time:</span>
@@ -183,11 +182,16 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted } from 'vue';
-import type { TodoItem } from "../types/todo"
-import { getTodos, createTodo, updateTodo as updateTodoApi, deleteTodo as deleteTodoApi } from '../services/todoService';
-import { Edit2, Trash2, Plus, Check, X } from 'lucide-vue-next';
-import TodoForm from './TodoForm.vue';
+import { defineComponent, ref, onMounted } from 'vue'
+import type { TodoItem } from '../types/todo'
+import {
+  getTodos,
+  createTodo,
+  updateTodo as updateTodoApi,
+  deleteTodo as deleteTodoApi,
+} from '../services/todoService'
+import { Edit2, Trash2, Plus, Check, X } from 'lucide-vue-next'
+import TodoForm from './TodoForm.vue'
 
 export default defineComponent({
   name: 'TodoList',
@@ -197,7 +201,7 @@ export default defineComponent({
     Trash2,
     Plus,
     Check,
-    X
+    X,
   },
   props: {
     userRole: {
@@ -205,142 +209,144 @@ export default defineComponent({
       required: true,
     },
   },
-  setup(props) {
-    const todos = ref<TodoItem[]>([]);
-    const error = ref<string | null>(null);
-    const showForm = ref(false);
-    const selectedTodo = ref<TodoItem | null>(null);
-    const expandedItems = ref<string[]>([]);
-    const editingNoteId = ref<string | null>(null);
-    const editingNoteText = ref('');
+  setup() {
+    const todos = ref<TodoItem[]>([])
+    const error = ref<string | null>(null)
+    const showForm = ref(false)
+    const selectedTodo = ref<TodoItem | null>(null)
+    const expandedItems = ref<string[]>([])
+    const editingNoteId = ref<string | null>(null)
+    const editingNoteText = ref('')
 
     const toggleAccordion = (todoId: string) => {
-      const index = expandedItems.value.indexOf(todoId);
+      const index = expandedItems.value.indexOf(todoId)
       if (index === -1) {
         // Expand with animation
-        expandedItems.value.push(todoId);
+        expandedItems.value.push(todoId)
       } else {
         // Collapse with animation
-        expandedItems.value.splice(index, 1);
+        expandedItems.value.splice(index, 1)
       }
-    };
+    }
 
     const fetchTodos = async () => {
       try {
-        todos.value = await getTodos();
-        error.value = null;
+        todos.value = await getTodos()
+        error.value = null
       } catch (err) {
-        error.value = 'Failed to fetch todos. Please try again.';
-        console.error(err);
+        error.value = 'Failed to fetch todos. Please try again.'
+        console.error(err)
       }
-    };
+    }
 
-    onMounted(fetchTodos);
+    onMounted(fetchTodos)
 
     const handleTodoSubmit = async (todoData: Partial<TodoItem>) => {
       try {
         if (selectedTodo.value) {
-          const { id } = selectedTodo.value;
-          const updatedTodo = await updateTodoApi(id, todoData);
-          const index = todos.value.findIndex(t => t.id === id);
+          const { id } = selectedTodo.value
+          const updatedTodo = await updateTodoApi(id, todoData)
+          const index = todos.value.findIndex((t) => t.id === id)
           if (index !== -1) {
-            todos.value[index] = updatedTodo;
+            todos.value[index] = updatedTodo
           }
         } else {
-          const newTodo = await createTodo(todoData as Omit<TodoItem, 'id' | 'createdAt'>);
-          todos.value.push(newTodo);
+          const newTodo = await createTodo(todoData as Omit<TodoItem, 'id' | 'createdAt'>)
+          todos.value.push(newTodo)
         }
-        handleFormCancel();
-        error.value = null;
+        handleFormCancel()
+        error.value = null
       } catch (err) {
-        error.value = `Failed to ${selectedTodo.value ? 'update' : 'create'} todo. Please try again.`;
-        console.error(err);
+        error.value = `Failed to ${selectedTodo.value ? 'update' : 'create'} todo. Please try again.`
+        console.error(err)
       }
-    };
+    }
 
     const handleFormCancel = () => {
-      showForm.value = false;
-      selectedTodo.value = null;
-    };
+      showForm.value = false
+      selectedTodo.value = null
+    }
 
     const editTodo = (todo: TodoItem) => {
-      selectedTodo.value = todo;
-      showForm.value = true;
-    };
+      selectedTodo.value = todo
+      showForm.value = true
+    }
 
     const toggleTodo = async (todo: TodoItem) => {
       try {
-        const updatedTodo = await updateTodoApi(todo.id, { completed: !todo.completed });
-        const index = todos.value.findIndex((t) => t.id === todo.id);
+        const updatedTodo = await updateTodoApi(todo.id, { completed: !todo.completed })
+        const index = todos.value.findIndex((t) => t.id === todo.id)
         if (index !== -1) {
-          todos.value[index] = updatedTodo;
+          todos.value[index] = updatedTodo
         }
-        error.value = null;
+        error.value = null
       } catch (err) {
-        error.value = 'Failed to update todo. Please try again.';
-        console.error(err);
+        error.value = 'Failed to update todo. Please try again.'
+        console.error(err)
       }
-    };
+    }
 
     const editNote = (todo: TodoItem) => {
-      editingNoteId.value = todo.id;
-      editingNoteText.value = todo.notes || '';
-    };
+      editingNoteId.value = todo.id
+      editingNoteText.value = todo.notes || ''
+    }
 
     const cancelEditNote = () => {
-      editingNoteId.value = null;
-      editingNoteText.value = '';
-    };
+      editingNoteId.value = null
+      editingNoteText.value = ''
+    }
 
     const saveNote = async (todo: TodoItem) => {
       try {
-        const updatedTodo = await updateTodoApi(todo.id, { notes: editingNoteText.value });
-        const index = todos.value.findIndex((t) => t.id === todo.id);
+        const updatedTodo = await updateTodoApi(todo.id, { notes: editingNoteText.value })
+        const index = todos.value.findIndex((t) => t.id === todo.id)
         if (index !== -1) {
-          todos.value[index] = updatedTodo;
+          todos.value[index] = updatedTodo
         }
-        editingNoteId.value = null;
-        editingNoteText.value = '';
-        error.value = null;
+        editingNoteId.value = null
+        editingNoteText.value = ''
+        error.value = null
       } catch (err) {
-        error.value = 'Failed to save note. Please try again.';
-        console.error(err);
+        error.value = 'Failed to save note. Please try again.'
+        console.error(err)
       }
-    };
+    }
 
     const deleteNote = async (todo: TodoItem) => {
       try {
-        const updatedTodo = await updateTodoApi(todo.id, { notes: undefined });
-        const index = todos.value.findIndex((t) => t.id === todo.id);
+        const updatedTodo = await updateTodoApi(todo.id, { notes: undefined })
+        const index = todos.value.findIndex((t) => t.id === todo.id)
         if (index !== -1) {
-          todos.value[index] = updatedTodo;
+          todos.value[index] = updatedTodo
         }
-        error.value = null;
+        error.value = null
       } catch (err) {
-        error.value = 'Failed to delete note. Please try again.';
-        console.error(err);
+        error.value = 'Failed to delete note. Please try again.'
+        console.error(err)
       }
-    };
+    }
 
     const deleteTodo = async (id: string) => {
       try {
-        await deleteTodoApi(id);
-        todos.value = todos.value.filter(t => t.id !== id);
-        expandedItems.value = expandedItems.value.filter(itemId => itemId !== id);
-        error.value = null;
+        await deleteTodoApi(id)
+        todos.value = todos.value.filter((t) => t.id !== id)
+        expandedItems.value = expandedItems.value.filter((itemId) => itemId !== id)
+        error.value = null
       } catch (err) {
-        error.value = 'Failed to delete todo. Please try again.';
-        console.error(err);
+        error.value = 'Failed to delete todo. Please try again.'
+        console.error(err)
       }
-    };
+    }
 
     const formatTime = (date: string) => {
-      return new Date(date).toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: 'numeric',
-        hour12: true
-      }).toLowerCase();
-    };
+      return new Date(date)
+        .toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: 'numeric',
+          hour12: true,
+        })
+        .toLowerCase()
+    }
 
     return {
       todos,
@@ -361,8 +367,7 @@ export default defineComponent({
       deleteNote,
       deleteTodo,
       formatTime,
-    };
+    }
   },
-});
+})
 </script>
-

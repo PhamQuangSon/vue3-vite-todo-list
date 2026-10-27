@@ -1,6 +1,10 @@
-@import './base.css';
+@import 'tailwindcss';
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Keeps animate-fade-right/up/down, used by TodoList and TodoForm. A missing
+   animation plugin does not error, it silently stops animating. */
+@plugin 'tailwindcss-animated';
 
+/* Design tokens (:root / .dark) are appended by the shadcn-vue setup. Until
+   then no token utility (bg-primary, text-muted-foreground) resolves — which
+   was already true before, because tailwind.config.js referenced CSS variables
+   that were never defined anywhere. */

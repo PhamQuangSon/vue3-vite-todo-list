@@ -41,16 +41,16 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from 'vue';
-import { Plus, Check, X } from 'lucide-vue-next';
-import type { TodoItem } from '../types/todo';
+import { defineComponent, ref, watch } from 'vue'
+import { Plus, Check, X } from 'lucide-vue-next'
+import type { TodoItem } from '../types/todo'
 
 export default defineComponent({
   name: 'TodoForm',
   components: {
     Plus,
     Check,
-    X
+    X,
   },
   props: {
     userRole: {
@@ -59,39 +59,39 @@ export default defineComponent({
     },
     todoToEdit: {
       type: Object as () => TodoItem | null,
-      default: null
-    }
+      default: null,
+    },
   },
   emits: ['submit', 'cancel'],
   setup(props, { emit }) {
-    const title = ref('');
-    const time = ref('');
-    const notes = ref('');
-    const isEditing = ref(false);
+    const title = ref('')
+    const time = ref('')
+    const notes = ref('')
+    const isEditing = ref(false)
 
     const resetForm = () => {
-      title.value = '';
-      time.value = '';
-      notes.value = '';
-      isEditing.value = false;
-    };
+      title.value = ''
+      time.value = ''
+      notes.value = ''
+      isEditing.value = false
+    }
 
     const updateFormWithTodo = (todo: TodoItem | null) => {
       if (todo) {
-        title.value = todo.title;
-        time.value = todo.time || '';
-        notes.value = todo.notes || '';
-        isEditing.value = true;
+        title.value = todo.title
+        time.value = todo.time || ''
+        notes.value = todo.notes || ''
+        isEditing.value = true
       } else {
-        resetForm();
+        resetForm()
       }
-    };
+    }
 
     // Watch for changes in todoToEdit and update form fields
-    watch(() => props.todoToEdit, updateFormWithTodo, { immediate: true });
+    watch(() => props.todoToEdit, updateFormWithTodo, { immediate: true })
 
     const handleSubmit = () => {
-      if (!title.value.trim()) return;
+      if (!title.value.trim()) return
 
       const todoData = {
         title: title.value,
@@ -99,23 +99,23 @@ export default defineComponent({
         createdAt: props.todoToEdit?.createdAt || new Date(),
         ...(props.userRole === 'paid' && {
           time: time.value || undefined,
-          notes: notes.value.trim() || undefined
-        })
-      };
-
-      if (props.todoToEdit) {
-        emit('submit', { ...todoData, id: props.todoToEdit.id });
-      } else {
-        emit('submit', todoData);
+          notes: notes.value.trim() || undefined,
+        }),
       }
 
-      resetForm();
-    };
+      if (props.todoToEdit) {
+        emit('submit', { ...todoData, id: props.todoToEdit.id })
+      } else {
+        emit('submit', todoData)
+      }
+
+      resetForm()
+    }
 
     const handleCancel = () => {
-      resetForm();
-      emit('cancel');
-    };
+      resetForm()
+      emit('cancel')
+    }
 
     return {
       title,
@@ -123,9 +123,8 @@ export default defineComponent({
       notes,
       isEditing,
       handleSubmit,
-      handleCancel
-    };
+      handleCancel,
+    }
   },
-});
+})
 </script>
-

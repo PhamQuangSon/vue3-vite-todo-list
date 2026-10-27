@@ -1,13 +1,16 @@
 {
-  "include": [
-    "vite.config.*",
-    "vitest.config.*",
-    "cypress.config.*",
-    "nightwatch.conf.*",
-    "playwright.config.*"
-  ],
+  // @vue/tsconfig 0.9 ships only tsconfig.json (base), .dom.json and .lib.json —
+  // there is no .node.json preset, and extending a missing file silently leaves
+  // `target` at ES5, which then fails on every `#private` field in node_modules.
+  "extends": "@vue/tsconfig/tsconfig.json",
+  // eslint.config.ts is deliberately absent: eslint's own Linter.Config and
+  // typescript-eslint's FlatConfig disagree on languageOptions, so annotating
+  // the export fails while leaving it inferred is unnameable under pnpm
+  // (TS2742). ESLint validates the file by executing it, which is enough.
+  "include": ["vite.config.*"],
   "compilerOptions": {
     "composite": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "types": ["node"]

@@ -1,0 +1,17 @@
+{
+  // Specs get their own project rather than being folded into tsconfig.app.json.
+  // `pnpm build` runs type-check, so putting them in the app project would turn
+  // every stale assertion into a build failure the moment a DTO type changes.
+  //
+  // The include list repeats the app's sources deliberately: with `composite`,
+  // TypeScript requires every file in the program to be listed, and the specs
+  // import components, services and types.
+  "extends": "./tsconfig.app.json",
+  "include": ["env.d.ts", "src/**/*", "src/**/*.vue", "test/**/*"],
+  "exclude": [],
+  "compilerOptions": {
+    "composite": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.vitest.tsbuildinfo",
+    "types": ["node", "vitest/globals"]
+  }
+}
