@@ -10,5 +10,14 @@
     {
       "path": "./tsconfig.vitest.json"
     }
-  ]
+  ],
+  // Referenced projects carry their own copy of this; it is repeated here only
+  // because tooling (the shadcn-vue CLI among others) looks for the alias in
+  // the root tsconfig and does not follow project references.
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
 }
