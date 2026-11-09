@@ -42,7 +42,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, watch, type PropType } from 'vue'
-import { Plus, Check, X } from 'lucide-vue-next'
+import { Plus, Check, X } from '@lucide/vue'
 import type { TodoItem, UpdateTodoPayload } from '../types/todo'
 import type { Plan } from '../types/auth'
 

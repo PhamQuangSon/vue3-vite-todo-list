@@ -1,11 +1,11 @@
 import { mount, flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import TodoList from '../TodoList.vue'
 import { getTodo, getTodos, updateTodo, deleteTodo } from '../../services/todoService'
 import type { TodoItem } from '../../types/todo'
 import type { Plan } from '../../types/auth'
 import TodoForm from '../TodoForm.vue'
-import { Trash2, Plus, Check, X } from 'lucide-vue-next'
 import { axiosErrorWith } from '../../../test/helpers/axios'
 
 vi.mock('../../services/todoService', () => ({
@@ -16,13 +16,21 @@ vi.mock('../../services/todoService', () => ({
   deleteTodo: vi.fn(),
 }))
 
-vi.mock('lucide-vue-next', () => ({
-  Edit2: { render: () => null },
+// @lucide/vue icons referenced by the new TodoList.vue
+vi.mock('@lucide/vue', () => ({
+  Pencil: { render: () => null },
   Trash2: { render: () => null },
   Plus: { render: () => null },
   Check: { render: () => null },
   X: { render: () => null },
 }))
+
+/** Fresh QueryClient per test so no state leaks between cases. */
+function makeQueryClient() {
+  return new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  })
+}
 
 describe('TodoList', () => {
   // Shaped like a real list response: `notes` is absent, because GET /todos
@@ -47,10 +55,12 @@ describe('TodoList', () => {
   ]
 
   const mountComponent = async (plan: Plan = 'FREE') => {
+    const queryClient = makeQueryClient()
     const wrapper = mount(TodoList, {
       props: { plan },
       global: {
-        components: { TodoForm, Trash2, Plus, Check, X },
+        plugins: [[VueQueryPlugin, { queryClient }]],
+        components: { TodoForm },
       },
     })
     await flushPromises()
@@ -84,8 +94,7 @@ describe('TodoList', () => {
 
     // The API defaults limit to 20 while the FREE quota is 50, so the default
     // would hide 30 todos.
-    expect(getTodos).toHaveBeenCalledWith()
-    expect(vi.mocked(getTodos).mock.calls[0]).toEqual([])
+    expect(getTodos).toHaveBeenCalledWith({ limit: 50, cursor: undefined })
   })
 
   it('toggles todo completion status', async () => {
@@ -94,10 +103,11 @@ describe('TodoList', () => {
     vi.mocked(updateTodo).mockResolvedValueOnce({ ...mockTodos[0], completed: true, version: 1 })
 
     await wrapper.find('[data-test="todo-checkbox"]').trigger('click')
-
-    expect(updateTodo).toHaveBeenCalledWith('1', { completed: true })
-
+    // TanStack Query's onMutate awaits cancelQueries before calling mutationFn,
+    // so the service call lands in the next microtask batch.
     await flushPromises()
+
+    expect(updateTodo).toHaveBeenCalledWith('1', { completed: true }, 0)
 
     expect(wrapper.find('[data-test="todo-checkbox"]').classes()).toContain('bg-[#ffd700]')
   })
@@ -150,11 +160,12 @@ describe('TodoList', () => {
       await wrapper.find('[data-test="accordion-toggle"]').trigger('click')
       await flushPromises()
       await wrapper.find('[data-test="delete-note-button"]').trigger('click')
+      await flushPromises()
 
       // `{ notes: undefined }` serializes to `{}`, so the old code sent an
       // empty body and the note survived. null would be a 400: the DTO
-      // validates notes with @IsString().
-      expect(updateTodo).toHaveBeenCalledWith('1', { notes: '' })
+      // validates notes with @IsString(). Version is 0 from the fixture.
+      expect(updateTodo).toHaveBeenCalledWith('1', { notes: '' }, 0)
     })
 
     it('does not fetch the detail for a free account', async () => {
@@ -190,10 +201,10 @@ describe('TodoList', () => {
     vi.mocked(deleteTodo).mockResolvedValueOnce(undefined)
 
     await wrapper.find('[data-test="delete-todo-button"]').trigger('click')
+    await flushPromises()
 
     expect(deleteTodo).toHaveBeenCalledWith('1')
 
-    await flushPromises()
     await wrapper.vm.$nextTick()
 
     expect(wrapper.findAll('[data-test="todo-item"]')).toHaveLength(1)

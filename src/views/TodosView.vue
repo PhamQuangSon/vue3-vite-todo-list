@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { CircleUserRound } from 'lucide-vue-next'
+import { CircleUserRound } from '@lucide/vue'
 import TodoList from '@/components/TodoList.vue'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/stores/auth'

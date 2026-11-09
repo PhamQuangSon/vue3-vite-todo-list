@@ -63,8 +63,15 @@ export const createTodo = async (payload: CreateTodoPayload): Promise<TodoItem> 
   return response.data
 }
 
-export const updateTodo = async (id: string, patch: UpdateTodoPayload): Promise<TodoItem> => {
-  const response = await axiosInstance.patch<TodoItem>(`/todos/${id}`, updateBody(patch))
+export const updateTodo = async (
+  id: string,
+  patch: UpdateTodoPayload,
+  ifMatch?: number,
+): Promise<TodoItem> => {
+  const headers = ifMatch !== undefined ? { 'If-Match': `"${ifMatch}"` } : {}
+  const response = await axiosInstance.patch<TodoItem>(`/todos/${id}`, updateBody(patch), {
+    headers,
+  })
   return response.data
 }
 

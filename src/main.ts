@@ -2,6 +2,7 @@ import './assets/main.css'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
+import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 
 import App from './App.vue'
 import router from './router'
@@ -13,6 +14,22 @@ const app = createApp(App)
 
 const pinia = createPinia()
 app.use(pinia)
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Stale after 30s; background refetch when user re-focuses the tab.
+      staleTime: 30_000,
+      // Don't retry on 4xx — the error is deterministic, not transient.
+      retry: (count, err) => {
+        const status = (err as { response?: { status?: number } })?.response?.status
+        if (status && status >= 400 && status < 500) return false
+        return count < 2
+      },
+    },
+  },
+})
+app.use(VueQueryPlugin, { queryClient })
 
 // Before the router, so the first navigation already has a working bearer.
 setupInterceptors(api, pinia)

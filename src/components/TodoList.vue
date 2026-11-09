@@ -1,8 +1,39 @@
 <template>
   <div class="bg-white rounded-3xl shadow-lg p-6">
-    <!-- Error message -->
-    <div v-if="error" data-test="error-message" class="mb-4 p-4 bg-red-50 text-red-600 rounded-lg">
-      {{ error }}
+    <!-- Query error -->
+    <div v-if="queryError" data-test="error-message" class="mb-4 p-4 bg-red-50 text-red-600 rounded-lg">
+      {{ queryError }}
+    </div>
+    <!-- Mutation error -->
+    <div v-else-if="mutationError" data-test="error-message" class="mb-4 p-4 bg-red-50 text-red-600 rounded-lg">
+      {{ mutationError }}
+    </div>
+
+    <!-- 412 conflict banner ───────────────────────────────────────────────── -->
+    <div
+      v-if="conflictState"
+      data-test="conflict-banner"
+      class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg"
+    >
+      <p class="text-sm font-medium text-amber-800">
+        This todo was updated somewhere else (now at version {{ conflictState.serverVersion }}).
+      </p>
+      <div class="mt-2 flex gap-2">
+        <button
+          @click="resolveConflict(true)"
+          class="px-3 py-1.5 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+          data-test="conflict-overwrite"
+        >
+          Overwrite
+        </button>
+        <button
+          @click="resolveConflict(false)"
+          class="px-3 py-1.5 text-sm border border-amber-300 text-amber-800 rounded-lg hover:bg-amber-100 transition-colors"
+          data-test="conflict-accept"
+        >
+          Use server version
+        </button>
+      </div>
     </div>
 
     <div class="flex justify-between items-center mb-2">
@@ -17,7 +48,9 @@
     </div>
     <p class="text-lg text-gray-800 mb-4">
       You have {{ todos.length }} {{ todos.length === 1 ? 'task' : 'tasks' }}
+      <span v-if="hasNextPage" class="text-sm text-gray-400">(showing first {{ todos.length }})</span>
     </p>
+
     <!-- Todo Form -->
     <TodoForm
       v-if="showForm"
@@ -28,14 +61,16 @@
       data-test="todo-form"
     />
 
-    <div class="space-y-4">
+    <div v-if="isLoading" class="text-center py-8 text-gray-400">Loading…</div>
+
+    <div v-else class="space-y-4">
       <div
         v-for="todo in todos"
         :key="todo.id"
         data-test="todo-item"
         class="border border-gray-100 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow animate animate-fade-right"
       >
-        <!-- Todo Header - Always visible -->
+        <!-- Todo Header -->
         <div
           class="flex items-start space-x-3 p-4 bg-white cursor-pointer"
           @click="toggleAccordion(todo)"
@@ -44,7 +79,7 @@
           <div
             class="w-5 h-5 rounded-full border-2 border-[#ffd700] flex-shrink-0 mt-1 cursor-pointer"
             :class="{ 'bg-[#ffd700]': todo.completed }"
-            @click.stop="toggleTodo(todo)"
+            @click.stop="handleToggle(todo)"
             data-test="todo-checkbox"
           >
             <svg
@@ -79,10 +114,10 @@
                     class="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-[#ffd700] transition-colors"
                     data-test="edit-todo-button"
                   >
-                    <Edit2 :size="16" />
+                    <Pencil :size="16" />
                   </button>
                   <button
-                    @click.stop="deleteTodo(todo.id)"
+                    @click.stop="handleDelete(todo.id)"
                     class="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-red-500 transition-colors"
                     data-test="delete-todo-button"
                   >
@@ -94,7 +129,7 @@
           </div>
         </div>
 
-        <!-- Todo Details - Expandable Content -->
+        <!-- Accordion content -->
         <div
           v-show="expandedItems.includes(todo.id)"
           data-test="accordion-content"
@@ -105,13 +140,12 @@
             v-if="expandedItems.includes(todo.id)"
             class="pt-4 px-4 pb-4 border-t border-gray-100 animate animate-fade-up"
           >
-            <!-- Time if available -->
             <div v-if="todo.time" class="mb-3">
               <span class="text-sm font-medium text-gray-600">Time:</span>
               <span class="ml-2 text-sm text-gray-500" data-test="todo-time">{{ todo.time }}</span>
             </div>
 
-            <!-- Notes section -->
+            <!-- Notes section (PAID only) -->
             <div v-if="plan === 'PAID'" class="space-y-2">
               <p v-if="loadingNoteIds.includes(todo.id)" class="text-sm text-gray-500">
                 Loading note…
@@ -153,11 +187,11 @@
                       class="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-[#ffd700] transition-colors"
                       data-test="edit-note-button"
                     >
-                      <Edit2 :size="14" />
+                      <Pencil :size="14" />
                     </button>
                     <button
                       v-if="todo.notes"
-                      @click="deleteNote(todo)"
+                      @click="handleDeleteNote(todo)"
                       class="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-red-500 transition-colors"
                       data-test="delete-note-button"
                     >
@@ -183,223 +217,123 @@
         </div>
       </div>
     </div>
+
+    <!-- Load more -->
+    <div v-if="hasNextPage" class="mt-6 text-center">
+      <button
+        @click="fetchNextPage()"
+        :disabled="isFetchingNextPage"
+        class="px-6 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm text-gray-600 disabled:opacity-50"
+        data-test="load-more"
+      >
+        {{ isFetchingNextPage ? 'Loading…' : 'Load more' }}
+      </button>
+    </div>
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent, ref, onMounted, type PropType } from 'vue'
-import type { TodoItem, UpdateTodoPayload } from '../types/todo'
+<script setup lang="ts">
+import { ref } from 'vue'
+import { Pencil, Trash2, Plus, Check, X } from '@lucide/vue'
+import type { TodoItem } from '../types/todo'
 import type { Plan } from '../types/auth'
-import {
-  getTodos,
-  getTodo,
-  createTodo,
-  updateTodo as updateTodoApi,
-  deleteTodo as deleteTodoApi,
-} from '../services/todoService'
-import { toApiError } from '../api/errors'
-import { messageFor } from '../api/messages'
-import { Edit2, Trash2, Plus, Check, X } from 'lucide-vue-next'
+import type { UpdateTodoPayload } from '../types/todo'
+import { useTodos } from '../composables/useTodos'
 import TodoForm from './TodoForm.vue'
 
-export default defineComponent({
-  name: 'TodoList',
-  components: {
-    TodoForm,
-    Edit2,
-    Trash2,
-    Plus,
-    Check,
-    X,
-  },
-  props: {
-    /** From the JWT claim, not a query parameter the user can edit. */
-    plan: {
-      type: String as PropType<Plan>,
-      required: true,
-    },
-  },
-  setup(props) {
-    const todos = ref<TodoItem[]>([])
-    const error = ref<string | null>(null)
-    const showForm = ref(false)
-    const selectedTodo = ref<TodoItem | null>(null)
-    const expandedItems = ref<string[]>([])
-    const editingNoteId = ref<string | null>(null)
-    const editingNoteText = ref('')
-    const loadingNoteIds = ref<string[]>([])
+const props = defineProps<{ plan: Plan }>()
 
-    /**
-     * Every failure path used to invent its own sentence ("Failed to save note.
-     * Please try again."), which hid what the API actually said — a 403
-     * QUOTA_EXCEEDED and a 429 RATE_LIMITED both read as "please try again".
-     * Now the API's stable `code` chooses the wording.
-     */
-    const report = (e: unknown) => {
-      error.value = messageFor(toApiError(e))
-      console.error(e)
-    }
+const {
+  todos,
+  isLoading,
+  queryError,
+  mutationError,
+  fetchNextPage,
+  hasNextPage,
+  isFetchingNextPage,
+  loadingNoteIds,
+  loadNotes,
+  createTodo,
+  updateTodo,
+  deleteTodo,
+  conflictState,
+  resolveConflict,
+} = useTodos(() => props.plan)
 
-    const replaceTodo = (updated: TodoItem) => {
-      const index = todos.value.findIndex((t) => t.id === updated.id)
-      if (index !== -1) todos.value[index] = updated
-    }
+const showForm = ref(false)
+const selectedTodo = ref<TodoItem | null>(null)
+const expandedItems = ref<string[]>([])
+const editingNoteId = ref<string | null>(null)
+const editingNoteText = ref('')
 
-    /**
-     * Loads `notes` for one todo.
-     *
-     * GET /todos deliberately omits that column, so a paid user's existing note
-     * is simply absent from the list. Without this the UI shows "Add note" on
-     * every todo and the edit and delete buttons — gated on `todo.notes` — never
-     * appear, so the paid feature looks broken.
-     */
-    const loadNotes = async (todo: TodoItem) => {
-      if (props.plan !== 'PAID' || todo.notes !== undefined) return
+function toggleAccordion(todo: TodoItem) {
+  const index = expandedItems.value.indexOf(todo.id)
+  if (index === -1) {
+    expandedItems.value.push(todo.id)
+    void loadNotes(todo)
+  } else {
+    expandedItems.value.splice(index, 1)
+  }
+}
 
-      loadingNoteIds.value.push(todo.id)
-      try {
-        replaceTodo(await getTodo(todo.id))
-        error.value = null
-      } catch (e) {
-        report(e)
-      } finally {
-        loadingNoteIds.value = loadingNoteIds.value.filter((id) => id !== todo.id)
-      }
-    }
+function handleFormCancel() {
+  showForm.value = false
+  selectedTodo.value = null
+}
 
-    const toggleAccordion = (todo: TodoItem) => {
-      const index = expandedItems.value.indexOf(todo.id)
-      if (index === -1) {
-        expandedItems.value.push(todo.id)
-        void loadNotes(todo)
-      } else {
-        expandedItems.value.splice(index, 1)
-      }
-    }
+function handleTodoSubmit(todoData: UpdateTodoPayload) {
+  if (selectedTodo.value) {
+    // Pass current version for optimistic concurrency.
+    updateTodo(selectedTodo.value.id, todoData, selectedTodo.value.version)
+  } else {
+    if (!todoData.title) return
+    createTodo({ ...todoData, title: todoData.title })
+  }
+  handleFormCancel()
+}
 
-    const fetchTodos = async () => {
-      try {
-        // The API answers with { items, nextCursor }, not a bare array.
-        const { items } = await getTodos()
-        todos.value = items
-        error.value = null
-      } catch (e) {
-        report(e)
-      }
-    }
+function editTodo(todo: TodoItem) {
+  selectedTodo.value = todo
+  showForm.value = true
+}
 
-    onMounted(fetchTodos)
+function handleToggle(todo: TodoItem) {
+  updateTodo(todo.id, { completed: !todo.completed }, todo.version)
+}
 
-    const handleFormCancel = () => {
-      showForm.value = false
-      selectedTodo.value = null
-    }
+function handleDelete(id: string) {
+  deleteTodo(id)
+  expandedItems.value = expandedItems.value.filter((itemId) => itemId !== id)
+}
 
-    const handleTodoSubmit = async (todoData: UpdateTodoPayload) => {
-      const editing = selectedTodo.value
-      try {
-        if (editing) {
-          replaceTodo(await updateTodoApi(editing.id, todoData))
-        } else {
-          if (!todoData.title) return
-          todos.value.push(await createTodo({ ...todoData, title: todoData.title }))
-        }
-        handleFormCancel()
-        error.value = null
-      } catch (e) {
-        report(e)
-      }
-    }
+function editNote(todo: TodoItem) {
+  editingNoteId.value = todo.id
+  editingNoteText.value = todo.notes ?? ''
+}
 
-    const editTodo = (todo: TodoItem) => {
-      selectedTodo.value = todo
-      showForm.value = true
-    }
+function cancelEditNote() {
+  editingNoteId.value = null
+  editingNoteText.value = ''
+}
 
-    const toggleTodo = async (todo: TodoItem) => {
-      try {
-        replaceTodo(await updateTodoApi(todo.id, { completed: !todo.completed }))
-        error.value = null
-      } catch (e) {
-        report(e)
-      }
-    }
+function saveNote(todo: TodoItem) {
+  updateTodo(todo.id, { notes: editingNoteText.value }, todo.version)
+  cancelEditNote()
+}
 
-    const editNote = (todo: TodoItem) => {
-      editingNoteId.value = todo.id
-      editingNoteText.value = todo.notes ?? ''
-    }
+function handleDeleteNote(todo: TodoItem) {
+  // Empty string, not undefined: JSON.stringify drops undefined values.
+  // null is rejected by the DTO's @IsString() validator.
+  updateTodo(todo.id, { notes: '' }, todo.version)
+}
 
-    const cancelEditNote = () => {
-      editingNoteId.value = null
-      editingNoteText.value = ''
-    }
-
-    const saveNote = async (todo: TodoItem) => {
-      try {
-        replaceTodo(await updateTodoApi(todo.id, { notes: editingNoteText.value }))
-        cancelEditNote()
-        error.value = null
-      } catch (e) {
-        report(e)
-      }
-    }
-
-    const deleteNote = async (todo: TodoItem) => {
-      try {
-        // An empty string, not undefined: JSON.stringify drops an undefined
-        // value, so the request body was `{}` and the note was never cleared.
-        // null is not an option either — the DTO validates notes with
-        // @IsString(), so it would be a 400.
-        replaceTodo(await updateTodoApi(todo.id, { notes: '' }))
-        error.value = null
-      } catch (e) {
-        report(e)
-      }
-    }
-
-    const deleteTodo = async (id: string) => {
-      try {
-        await deleteTodoApi(id)
-        todos.value = todos.value.filter((t) => t.id !== id)
-        expandedItems.value = expandedItems.value.filter((itemId) => itemId !== id)
-        error.value = null
-      } catch (e) {
-        report(e)
-      }
-    }
-
-    const formatTime = (date: string) => {
-      return new Date(date)
-        .toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: 'numeric',
-          hour12: true,
-        })
-        .toLowerCase()
-    }
-
-    return {
-      todos,
-      error,
-      showForm,
-      selectedTodo,
-      expandedItems,
-      editingNoteId,
-      editingNoteText,
-      loadingNoteIds,
-      handleTodoSubmit,
-      handleFormCancel,
-      editTodo,
-      toggleTodo,
-      toggleAccordion,
-      editNote,
-      cancelEditNote,
-      saveNote,
-      deleteNote,
-      deleteTodo,
-      formatTime,
-    }
-  },
-})
+function formatTime(date: string) {
+  return new Date(date)
+    .toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true,
+    })
+    .toLowerCase()
+}
 </script>

@@ -1,5 +1,11 @@
 import api from '@/config/axios'
-import type { AuthTokenResponse } from '@/types/auth'
+import type { AuthTokenResponse, Plan } from '@/types/auth'
+
+export interface MeResponse {
+  id: string
+  email: string
+  plan: Plan
+}
 
 /**
  * All four calls send credentials, not just refresh and logout.
@@ -35,6 +41,12 @@ export const authApi = {
 
   async logout(): Promise<void> {
     await api.post('/auth/logout', null, withCookie)
+  },
+
+  /** Requires a valid access token. Returns id, email and plan from the DB. */
+  async me(): Promise<MeResponse> {
+    const { data } = await api.get<MeResponse>('/auth/me')
+    return data
   },
 }
 

@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { authApi, type Credentials } from '@/api/authApi'
+import { authApi, type Credentials, type MeResponse } from '@/api/authApi'
 import { isRateLimited, isUnauthenticated, toApiError } from '@/api/errors'
 import { decodeJwt } from '@/lib/jwt'
 import { withLock } from '@/lib/webLock'
@@ -151,6 +151,23 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * After a successful refresh, fetch the user's email from the server.
+   *
+   * The access token does not carry the email (only sub/plan/tv/sid), so after
+   * a page reload the store knows the user is authenticated but not their
+   * display name. This call fills that gap — non-fatal if it fails.
+   */
+  async function restoreEmail(): Promise<void> {
+    try {
+      const me: MeResponse = await authApi.me()
+      email.value = me.email
+      setSessionHint(me.email)
+    } catch {
+      // Best-effort. The user is authenticated; they just see their UUID prefix.
+    }
+  }
+
+  /**
    * Restores the session once per page load.
    *
    * Memoized, and awaited by the router guard, so navigation never decides
@@ -164,7 +181,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       email.value = readSessionEmail()
       return refresh().then(
-        () => {},
+        () => restoreEmail(),
         () => {
           // Failure just means "anonymous". The guard routes from there, and
           // noteRefreshFailure has already cleared the hint on a 401.
